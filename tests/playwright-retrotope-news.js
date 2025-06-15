@@ -1,14 +1,9 @@
 import { chromium } from 'playwright';
 import OpenAI from 'openai';
 import assert from 'assert';
-import { buildLocatorOptions } from '../helpers/locatorBuilder.js';
+import { getVisibleElements, buildLocatorOptions } from '../helpers/locatorBuilder.js';
 import { systemMessage } from '../helpers/systemMessages.js';
 import { getLocatorFromAI } from '../helpers/openaiClient.js';
-
-
-
-
-// const userMessage = `Найди кнопку, нажав которую пользователь сможет прочитать статью BioWorld Today.`; // Example user message
 
 (async () => {
   //console.log('🚀 Starting browser...');
@@ -20,39 +15,16 @@ import { getLocatorFromAI } from '../helpers/openaiClient.js';
   await page.goto('https://expel.com/');
   await page.waitForSelector('body');
 
-  const elements = await page.$$(
-  'a, button, input, textarea, [role], [onclick], [tabindex], [aria-label], [type], [name]'
-);
+  const visibleElements = await getVisibleElements(page);
+  const locatorOptions = buildLocatorOptions(visibleElements);
 
-const visibleElements = [];
-for (const el of elements) {
-  if (await el.isVisible()) {
-    const props = await el.evaluate(node => ({
-      tag: node.tagName,
-      type: node.getAttribute('type') || null,
-      name: node.getAttribute('name') || null,
-      role: node.getAttribute('role') || null,
-      ariaLabel: node.getAttribute('aria-label') || null,
-      text: node.textContent?.trim() || '',
-      href: node.getAttribute('href') || null,
-      id: node.id || null,
-      class: node.className || null,
-      value: node.value || null,
-      tabindex: node.getAttribute('tabindex') || null,
-      onclick: node.getAttribute('onclick') || null,
-    }));
-    visibleElements.push(props);
-  }
-}
-    const locatorOptions = buildLocatorOptions(visibleElements);
+  const json = JSON.stringify(locatorOptions, null, 2);
 
-    const json = JSON.stringify(locatorOptions, null, 2);
+  console.log('Locator options count:', locatorOptions.length);
+  console.log('JSON length:', json.length);
+  console.log('Approx. tokens:', Math.round(json.length / 4));
 
-    console.log('Locator options count:', locatorOptions.length);
-    console.log('JSON length:', json.length);
-    console.log('Approx. tokens:', Math.round(json.length / 4));
-
-    await page.pause();
+  await page.pause();
 
 // // Curious what did we parsed and sent to AI?
 // console.log('JSON content:', json);
