@@ -2,20 +2,29 @@ import { chromium } from 'playwright';
 import OpenAI from 'openai';
 import assert from 'assert';
 
+// Describes the answer's format, HOW to provide the answer, not WHAT to do
 const systemMessage = `
-Ты — бот, который выдает Playwright-локатор в одну строку.
-Формат ответа: только рабочий УНИКАЛЬНЫЙ Playwright-локатор, без пояснений и переносов строк.
-Примеры: 
+You are an assistant that generates a valid, unique Playwright locator as a single line of code.
+Response format: only the working, UNIQUE Playwright locator, with no explanations or line breaks.
+
+Examples:
 'div:nth-child(2) > .info > .details'
-'text="Read more"
+'text="Read more"'
 '.event:nth-child(3) .details'
 'css=.event .details'
 'text="The Concept of the LPO" >> css=.event .details >> text="Read more"'
-Используй только поддерживаемые Playwright локаторы: text=..., css=..., или комбинации через locator(). Не используй XPath, :text(), :has(), сложные CSS-псевдоселекторы и любые неподдерживаемые конструкции.
-Если не можешь найти, ответь "NOT FOUND" и объясни почему не нашел, а также дай наиболее близкий рабочий вариант Playwright-локатора, если такой есть.
-Верни локатор для клика по КЛИКАБЕЛЬНОМУ элементу (например, кнопке или ссылке).
-Если твой локатор содержит :text(, :has(, двойную точку .. или любые сложные CSS-селекторы — обязательно перегенерируй ответ, пока не получится валидный Playwright-локатор.
-`; // Describes the answer's format, HOW to provide the answer, not WHAT to do
+
+Use only supported Playwright locators: text=..., css=..., or combinations using Playwright's locator syntax. Do not use XPath, :text(), :has(), complex CSS pseudo-selectors, or any unsupported constructs.
+
+If you cannot find a valid locator, reply with "NOT FOUND" and briefly explain why, and provide the closest working Playwright locator if possible.
+
+Return a locator for a CLICKABLE element (such as a button or link).
+If your locator contains :text(, :has(, double dots .., or any complex CSS selectors, regenerate your answer until you produce a valid Playwright locator.
+
+**Important:** Only use texts, attributes, and values that are actually present in the provided JSON. Do not invent or assume any texts or values that are not in the JSON.
+
+If your locator matches more than one element, make it more specific using available attributes (such as class, id, href, aria-label, etc.) from the JSON, so that it matches exactly one element.
+`;
 
 // const userMessage = `Найди кнопку, нажав которую пользователь сможет прочитать статью BioWorld Today.`; // Example user message
 
@@ -26,73 +35,99 @@ const systemMessage = `
   const page = await browser.newPage();
 
   //console.log('🌐 Navigating to page...');
-  await page.goto('https://www.retrotope.com/news/');
-  await page.waitForSelector('body > div > div > section.articles.events.events_page.block');
+  await page.goto('https://expel.com/');
+  await page.waitForSelector('body');
 
-  // console.log('📄 Fetching page content...');
-//   const html = await page.$eval('div.cont', el => el.outerHTML);
-const html = await page.$eval('body > div > div > section.articles.events.events_page.block', el => el.outerHTML);
-//   console.log(html); // Log the HTML content of the page
+  const elements = await page.$$(
+  'a, button, input, textarea, [role], [onclick], [tabindex], [aria-label], [type], [name]'
+);
+
+const visibleElements = [];
+for (const el of elements) {
+  if (await el.isVisible()) {
+    const props = await el.evaluate(node => ({
+      tag: node.tagName,
+      type: node.getAttribute('type') || null,
+      name: node.getAttribute('name') || null,
+      role: node.getAttribute('role') || null,
+      ariaLabel: node.getAttribute('aria-label') || null,
+      text: node.textContent?.trim() || '',
+      href: node.getAttribute('href') || null,
+      id: node.id || null,
+      class: node.className || null,
+      value: node.value || null,
+      tabindex: node.getAttribute('tabindex') || null,
+      onclick: node.getAttribute('onclick') || null,
+    }));
+    visibleElements.push(props);
+  }
+}
+
+  const json = JSON.stringify(visibleElements, null, 2);
+
+// // Curious what did we parsed and sent to AI?
+// console.log('JSON content:', json);
+// console.log('JSON length:', json.length);
 
   console.log('🤖 Calling OpenAI...');
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const completion = await openai.chat.completions.create({
-  model: 'gpt-4o',
-  temperature: 0,
-  messages: [
-    {
-      role: 'system',
-      content: systemMessage
-    },
-    {
-      role: 'user',
-      content: 'На странице есть несколько статей, у каждой есть заголовок и кнопка "Read more". Найди КЛИКАБЕЛЬНЫЙ элемент (кнопку "Read more"), который относится именно к статье с заголовком "The Concept of the LPO". Верни только рабочий Playwright-локатор для клика по этой кнопке. Не используй некликабельные элементы. Вот HTML-код страницы:' + html
-    //   content: 'Найти наиболее подходящий кликабельный элемент чтобы перейти на статью про "Positive Results from Studies"'  + html
-    }
-  ]
-});
+    model: 'gpt-4o',
+    temperature: 0,
+    messages: [
+      {
+        role: 'system',
+        content: systemMessage
+      },
+      {
+        role: 'user',
+        content: 'You are on the website of Cybersec company - Expel. You want to review their MDR packages. Figure out where is it on the page can be and which button/link to click to review the details of the packages.' + json
+      }
+    ]
+  });
 
-// Удаляем лишние кавычки и пробелы из ответа
-let locatorString = completion.choices[0].message.content.trim();
+  // Response cleanup
+  // Remove spaces and quotes
+  let locatorString = completion.choices[0].message.content.trim();
 
-// Удаляем Markdown-блоки (```css ... ```)
-locatorString = locatorString.replace(/```[a-z]*\s*([\s\S]*?)\s*```/i, '$1').trim();
+  // Removw markdown formatting
+  locatorString = locatorString.replace(/```[a-z]*\s*([\s\S]*?)\s*```/i, '$1').trim();
 
-// Удаляем .locator('...') и locator('...')
-locatorString = locatorString.replace(/\.?locator\(['"`](.*)['"`]\)/, '$1');
+  // Remove wrappers
+  locatorString = locatorString.replace(/\.?locator\(['"`](.*)['"`]\)/, '$1');
 
-// Проверяем на запрещённые конструкции
-if (
-  locatorString.includes(':text(') ||
-  locatorString.includes(':has(') ||
-  locatorString.includes('..') ||
-  locatorString.match(/[\[\]~^$*|]/)
-) {
-  console.error('❌ Локатор содержит неподдерживаемые конструкции:', locatorString);
+  // Forbidden constructs check
+  if (
+    locatorString.includes(':text(') ||
+    locatorString.includes(':has(') ||
+    locatorString.includes('..') ||
+    locatorString.match(/[\[\]~^$*|]/)
+  ) {
+    console.error('❌ Локатор содержит неподдерживаемые конструкции:', locatorString);
+    await browser.close();
+    process.exit(1);
+  }
+
+  const locator = page.locator(locatorString);
+  console.log('Locator string:', locatorString);
+  const count = await locator.count();
+  console.log(`Number of matches: ${count}`);
+  console.log('✅ Locator received:');
+  console.log(locator);
+
+  if (count !== 1) {
+    console.error(`❌ Локатор должен находить ровно 1 элемент, найдено: ${count}`);
+    await browser.close();
+    process.exit(1);
+  }
+
+  console.log('👉 Performing click...');
+  await locator.click();
+
+  await page.waitForLoadState('load');
+  const newUrl = page.url();
+  console.log('🌍 New page URL:', newUrl);
+
+  console.log('🎉 Done!');
   await browser.close();
-  process.exit(1);
-}
-
-const locator = page.locator(locatorString);
-console.log('Locator string:', locatorString);
-const count = await locator.count();
-console.log(`Number of matches: ${count}`);
-console.log('✅ Locator received:');
-console.log(locator);
-
-if (count !== 1) {
-  console.error(`❌ Локатор должен находить ровно 1 элемент, найдено: ${count}`);
-  await browser.close();
-  process.exit(1);
-}
-
-console.log('👉 Performing click...');
-await locator.click();
-
-await page.waitForLoadState('load');
-const newUrl = page.url();
-console.log('🌍 New page URL:', newUrl);
-
-console.log('🎉 Done!');
-await browser.close();
 })();
