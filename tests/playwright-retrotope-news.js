@@ -4,26 +4,13 @@ import assert from 'assert';
 
 // Describes the answer's format, HOW to provide the answer, not WHAT to do
 const systemMessage = `
-You are an assistant that generates a valid, unique Playwright locator as a single line of code.
-Response format: only the working, UNIQUE Playwright locator, with no explanations or line breaks.
-
-Examples:
-'div:nth-child(2) > .info > .details'
-'text="Read more"'
-'.event:nth-child(3) .details'
-'css=.event .details'
-'text="The Concept of the LPO" >> css=.event .details >> text="Read more"'
-
-Use only supported Playwright locators: text=..., css=..., or combinations using Playwright's locator syntax. Do not use XPath, :text(), :has(), complex CSS pseudo-selectors, or any unsupported constructs.
-
-If you cannot find a valid locator, reply with "NOT FOUND" and briefly explain why, and provide the closest working Playwright locator if possible.
-
-Return a locator for a CLICKABLE element (such as a button or link).
-If your locator contains :text(, :has(, double dots .., or any complex CSS selectors, regenerate your answer until you produce a valid Playwright locator.
-
-**Important:** Only use texts, attributes, and values that are actually present in the provided JSON. Do not invent or assume any texts or values that are not in the JSON.
-
-If your locator matches more than one element, make it more specific using available attributes (such as class, id, href, aria-label, etc.) from the JSON, so that it matches exactly one element.
+You are an assistant that selects the most appropriate Playwright locator from a provided list of valid locators.
+Choose only one locator that best matches the scenario. Do not invent or modify locators.
+Return only the locator string from the list, with no explanations or line breaks.
+Choose only one locator string from the provided list. Do not combine, modify, or invent locators. Return the locator string exactly as it appears in the list.
+If multiple elements have the same text, use additional attributes (such as tag, class, href, id) from the same object to make the locator unique.
+Для поиска элемента с несколькими признаками используй Playwright-специфичные конструкции, например, a.outline-button-dark:has-text("View MDR packages").
+If you cannot find a valid locator matching the task, reply with "NOT FOUND" and briefly explain why.
 `;
 
 // const userMessage = `Найди кнопку, нажав которую пользователь сможет прочитать статью BioWorld Today.`; // Example user message
@@ -63,50 +50,112 @@ for (const el of elements) {
   }
 }
 
-  const json = JSON.stringify(visibleElements, null, 2);
+const locatorOptions = [
+  {
+    locator: 'text="View MDR packages"',
+    tag: 'A',
+    text: 'View MDR packages',
+    href: 'https://expel.com/mdr-packages/',
+    class: 'outline-button-dark'
+  },
+  {
+    locator: 'css=.outline-button-dark',
+    tag: 'A',
+    text: 'View MDR packages',
+    href: 'https://expel.com/mdr-packages/',
+    class: 'outline-button-dark'
+  },
+  {
+    locator: 'text="Email threat detection"',
+    tag: 'A',
+    text: 'Email threat detection',
+    href: 'https://expel.com/solutions/email-threat-detection/',
+    class: null
+  },
+  {
+    locator: 'text="Optimize your SIEM security"',
+    tag: 'A',
+    text: 'Optimize your SIEM security',
+    href: 'https://expel.com/solutions/optimize-your-siem-security/',
+    class: null
+  },
+  {
+    locator: 'text="Achieve world-class security operations metrics"',
+    tag: 'A',
+    text: 'Achieve world-class security operations metrics',
+    href: 'https://expel.com/solutions/improve-security-operations-metrics/',
+    class: null
+  },
+  {
+    locator: 'text="Managed detection across products"',
+    tag: 'A',
+    text: 'Managed detection across products',
+    href: 'https://expel.com/solutions/cross-product-managed-detection/',
+    class: null
+  },
+  {
+    locator: 'text="Security data lake"',
+    tag: 'A',
+    text: 'Security data lake',
+    href: 'https://expel.com/solutions/security-data-lake/',
+    class: null
+  },
+  {
+    locator: 'text="Cloud detection and response"',
+    tag: 'A',
+    text: 'Cloud detection and response',
+    href: 'https://expel.com/solutions/cloud-security/',
+    class: null
+  }
+];
+
+// // Uncomment to see the raw list of visible elements
+
+  const json = JSON.stringify(locatorOptions, null, 2);
 
 // // Curious what did we parsed and sent to AI?
 // console.log('JSON content:', json);
 // console.log('JSON length:', json.length);
 
-  console.log('🤖 Calling OpenAI...');
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const messages = [
+  { role: 'system', content: systemMessage },
+  {
+    role: 'user',
+    content: `Here is the list of available elements (as JSON): ${json} Which locator should be used to click the button or link to review MDR packages?`
+  }
+];
+
+console.log('🤖 Calling OpenAI...');
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+let locatorString;
+let attempts = 0;
+while (attempts < 3) {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o',
     temperature: 0,
-    messages: [
-      {
-        role: 'system',
-        content: systemMessage
-      },
-      {
-        role: 'user',
-        content: 'You are on the website of Cybersec company - Expel. You want to review their MDR packages. Figure out where is it on the page can be and which button/link to click to review the details of the packages.' + json
-      }
-    ]
+    messages,
   });
-
-  // Response cleanup
-  // Remove spaces and quotes
-  let locatorString = completion.choices[0].message.content.trim();
-
-  // Removw markdown formatting
+  locatorString = completion.choices[0].message.content.trim();
   locatorString = locatorString.replace(/```[a-z]*\s*([\s\S]*?)\s*```/i, '$1').trim();
-
-  // Remove wrappers
   locatorString = locatorString.replace(/\.?locator\(['"`](.*)['"`]\)/, '$1');
 
-  // Forbidden constructs check
-  if (
-    locatorString.includes(':text(') ||
-    locatorString.includes(':has(') ||
-    locatorString.includes('..') ||
-    locatorString.match(/[\[\]~^$*|]/)
-  ) {
-    console.error('❌ Локатор содержит неподдерживаемые конструкции:', locatorString);
-    await browser.close();
-    process.exit(1);
-  }
+  // Логируем попытку и ответ
+  console.log(`\n--- Attempt #${attempts + 1} ---`);
+  console.log('Locator string:', locatorString);
+
+  const locator = page.locator(locatorString);
+  const count = await locator.count();
+  console.log(`Number of matches: ${count}`);
+
+  if (count === 1) break;
+
+  messages.push({
+    role: 'user',
+    content: `Previous locator "${locatorString}" matched ${count} elements. Generate a locator that matches exactly one clickable element, using only texts and attributes from the JSON.`
+  });
+  attempts++;
+}
 
   const locator = page.locator(locatorString);
   console.log('Locator string:', locatorString);
