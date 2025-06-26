@@ -37,3 +37,13 @@ export function buildLocatorOptions(visibleElements) {
     };
   });
 }
+
+export function normalizeLocatorString(locatorString) {
+  locatorString = locatorString.replace(/^["']|["']$/g, '');
+  locatorString = locatorString.replace(/^text="text=\\?"?(.+?)\\?"?"$/, 'text="$1"');
+  locatorString = locatorString.replace(/^text="text="(.+)"$/, 'text="$1"');
+  locatorString = locatorString.replace(/\\"/g, '"');
+  locatorString = locatorString.trim();
+
+  return locatorString;
+}
