@@ -1,7 +1,4 @@
-// node tests/playwright-retrotope-news.js
-
 import { chromium } from 'playwright';
-import OpenAI from 'openai';
 import assert from 'assert';
 import { getVisibleElements, buildLocatorOptions, normalizeLocatorString } from '../helpers/locatorBuilder.js';
 import { systemMessage } from '../helpers/systemMessages.js';
@@ -38,7 +35,8 @@ import { getLocatorFromAI } from '../helpers/openaiClient.js';
   {
     role: 'user',
     // content: `Here is the list of available elements (as JSON): ${json} Which locator should be used to click the button or link to review MDR packages?`
-    content: `Here is the list of available elements (as JSON): ${json} You are user who wants to request demo. Where do you go?`
+    // content: `Here is the list of available elements (as JSON): ${json} You are user who wants to request demo. Where do you go?`
+    content: `Here is the list of available elements (as JSON): ${json} You are user interested in the program MSSE. Which locator should be used to click the button or link to see more information about this program?`
     // content: `Here is the list of available elements (as JSON): ${json} Which locator should be used to click the button or link to review info about SIEM?`
     // content: `You want to work in this company. Which locator should be used to click the button or link to see Careers? Here is the list of available elements (as JSON): ${json}`
   }
