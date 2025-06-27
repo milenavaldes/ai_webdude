@@ -38,7 +38,9 @@ import { getLocatorFromAI } from '../helpers/openaiClient.js';
   {
     role: 'user',
     // content: `Here is the list of available elements (as JSON): ${json} Which locator should be used to click the button or link to review MDR packages?`
-     content: `Here is the list of available elements (as JSON): ${json} Which locator should be used to click the button or link to review info about SIEM?`
+    content: `Here is the list of available elements (as JSON): ${json} You are user who wants to request demo. Where do you go?`
+    // content: `Here is the list of available elements (as JSON): ${json} Which locator should be used to click the button or link to review info about SIEM?`
+    // content: `You want to work in this company. Which locator should be used to click the button or link to see Careers? Here is the list of available elements (as JSON): ${json}`
   }
 ];
 
@@ -57,7 +59,7 @@ console.log(locator);
 await page.pause();
 
 if (count !== 1) {
-  console.error(`❌ Локатор должен находить ровно 1 элемент, найдено: ${count}`);
+  console.error(`❌ Локатор должен находить ровно 1 видимый элемент, найдено: ${count}`);
   await browser.close();
   process.exit(1);
 }

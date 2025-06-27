@@ -11,7 +11,7 @@ Choose only one locator string from the provided list. Do not combine, modify, o
 
 If multiple elements have the same text, use additional attributes (such as tag, class, href, id) from the same object to make the locator unique.
 
-Для поиска элемента с несколькими признаками используй Playwright-специфичные конструкции, например, a.outline-button-dark:has-text("View MDR packages").
+To search for an element with multiple attributes, use Playwright-specific selectors, for example: a.outline-button-dark:has-text("View MDR packages").
 
 If you cannot find a valid locator matching the task, reply with "NOT FOUND" and briefly explain why.
 `;

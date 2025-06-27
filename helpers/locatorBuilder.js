@@ -27,14 +27,25 @@ export async function getVisibleElements(page) {
 
 export function buildLocatorOptions(visibleElements) {
   return visibleElements.map(el => {
-    const { tag, text, href, class: className } = el;
-    return {
-      locator: `text="${text}"`,
-      tag,
-      text,
-      href,
-      class: className
-    };
+    let locator = el.tag.toLowerCase();
+
+    if (el.class) locator += '.' + el.class.split(' ').join('.');
+    if (el.href) locator += `[href="${el.href}"]`;
+    if (el.id) locator += `#${el.id}`;
+    if (el.name) locator += `[name="${el.name}"]`;
+    if (el.role) locator += `[role="${el.role}"]`;
+    if (el.ariaLabel) locator += `[aria-label="${el.ariaLabel}"]`;
+    if (el.type) locator += `[type="${el.type}"]`;
+    if (el.tabindex) locator += `[tabindex="${el.tabindex}"]`;
+    if (el.onclick) locator += `[onclick="${el.onclick}"]`;
+    if (el.value) locator += `[value="${el.value}"]`;
+
+    if (el.parentClass) {
+      locator = `${el.parentTag ? el.parentTag.toLowerCase() : ''}.${el.parentClass.split(' ').join('.')} ${locator}`;
+    }
+    if (el.text) locator += `:has-text("${el.text}")`;
+
+    return { locator, ...el };
   });
 }
 
@@ -45,5 +56,8 @@ export function normalizeLocatorString(locatorString) {
   locatorString = locatorString.replace(/\\"/g, '"');
   locatorString = locatorString.trim();
 
+  if (!locatorString.includes(':visible')) {
+  locatorString += ':visible';
+}
   return locatorString;
 }
