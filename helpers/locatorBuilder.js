@@ -62,7 +62,7 @@ export async function getVisibleElements(page) {
 }
 
 /**
- * Builds a base locator string for an element (without .nth()).
+ * Builds a base locator string for an element
  * @param {Object} el
  * @returns {string}
  */
@@ -96,13 +96,14 @@ function buildBaseLocator(el) {
 
 /**
  * Builds locator options for a list of visible elements.
- * - Groups elements by base locator.
- * - Adds .nth() to locatorCode for uniqueness.
+ * - Removes duplicates by href+text.
+ * - Builds a unique locator string for each element (no .nth() or index).
  * - Removes all fields with null or undefined values from the output.
  * @param {Array<Object>} visibleElements
  * @returns {Array<Object>}
  */
 export function buildLocatorOptions(visibleElements) {
+  // Remove duplicates by unique key (href + text)
   const unique = [];
   const seen = new Set();
 
@@ -114,32 +115,36 @@ export function buildLocatorOptions(visibleElements) {
     }
   }
 
-  const grouped = new Map();
-  for (const el of unique) {
-    const baseLocator = buildBaseLocator(el);
-    if (!grouped.has(baseLocator)) grouped.set(baseLocator, []);
-    grouped.get(baseLocator).push(el);
-  }
+  // Build locator for each unique element (no index)
+  return unique.map(el => {
+    let locator = el.tag.toLowerCase();
 
-  const result = [];
-  for (const [baseLocator, group] of grouped.entries()) {
-    group.forEach((el, idx) => {
-      result.push({
-        locator: normalizeLocatorString(baseLocator),
-        nth: idx,
-        tag: el.tag,
-        text: el.text,
-        href: el.href,
-        boundingRect: el.boundingRect,
-        parentTag: el.parentTag,
-        parentClass: el.parentClass,
-        contextText: el.contextText,
-        domPath: el.domPath
-      });
-    });
-  }
+    if (el.class) locator += '.' + el.class.split(' ').join('.');
+    if (el.href) locator += `[href="${el.href}"]`;
+    if (el.id) locator += `#${el.id}`;
+    if (el.name) locator += `[name="${el.name}"]`;
+    if (el.role) locator += `[role="${el.role}"]`;
+    if (el.ariaLabel) locator += `[aria-label="${el.ariaLabel}"]`;
+    if (el.type) locator += `[type="${el.type}"]`;
+    if (el.tabindex) locator += `[tabindex="${el.tabindex}"]`;
+    if (el.onclick) locator += `[onclick="${el.onclick}"]`;
+    if (el.value) locator += `[value="${el.value}"]`;
 
-  return result;
+    if (el.parentClass && el.parentTag) {
+      locator =
+        `${el.parentTag.toLowerCase()}.${el.parentClass
+          .split(' ')
+          .join('.')}` +
+        ' ' +
+        locator;
+    }
+    if (el.text) locator += `:has-text("${el.text}")`;
+
+    const cleanEl = Object.fromEntries(
+      Object.entries(el).filter(([_, v]) => v != null)
+    );
+    return { locator, ...cleanEl };
+  });
 }
 
 
