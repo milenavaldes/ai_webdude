@@ -1,8 +1,12 @@
 import { chromium } from 'playwright';
 import assert from 'assert';
 import { getVisibleElements, buildLocatorOptions, normalizeLocatorString } from '../helpers/locatorBuilder.js';
-import { systemMessage } from '../helpers/systemMessages.js';
+import { systemMessage, pageContentPrompt } from '../helpers/systemMessages.js';
 import { getLocatorFromAI } from '../helpers/openaiClient.js';
+
+// Describe the task for the WebDude
+const taskDescription = `You want to work in this company. Where should you navigate to find job opportunities?`;
+
 
 (async () => {
   const browser = await chromium.launch({ headless: false, slowMo: 50 }); // headed mode
@@ -23,6 +27,8 @@ import { getLocatorFromAI } from '../helpers/openaiClient.js';
   const locatorOptions = buildLocatorOptions(visibleElements);
 
   const json = JSON.stringify(locatorOptions, null, 2);
+  // Pass page content to the AI prompt
+  const pageContent = pageContentPrompt(json);
 
   console.log('Locator options count:', locatorOptions.length);
   console.log('JSON length:', json.length);
@@ -42,8 +48,8 @@ console.log('JSON content:', json);
     // content: `Here is the list of available elements (as JSON): ${json} You are user who wants to request demo. Where do you go?`
     // content: `Here is the list of available elements (as JSON): ${json} You are user interested in the program MSSE. Which locator should be used to click the button or link to see more information about this program?`
     // content: `Here is the list of available elements (as JSON): ${json} You are user who want to apply to the university. Which locator should you push?`
-     content: `Here is the list of available elements (as JSON): ${json} Which locator should be used to click the button or link to review info about SIEM?`
-    // content: `You want to work in this company. Which locator should be used to click the button or link to see Careers? Here is the list of available elements (as JSON): ${json}`
+    // content: `Click the button or link to review info about SIEM?`
+       content: taskDescription + pageContent
   }
 ];
 
@@ -79,6 +85,6 @@ console.log('🌍 New page URL:', newUrl);
 
 console.log('🎉 Done! Are you happy with the the result?');
 
-  //await page.pause();
+  await page.pause();
   await browser.close();
 })();
